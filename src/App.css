@@ -43,10 +43,11 @@
     border: 1px solid #ccc;
     border-top: none;
     padding: 20px;
-    background-color: white;
+    background-color: rgb(245, 243, 243);
     border-radius: 0 0 4px 4px;
     justify-content: center;
     align-items: center;
+    
    
 }
 
@@ -54,6 +55,7 @@
     margin-top: 20px;
     justify-content: center;
     align-items: center;
+    
 }
 
 table {
@@ -64,6 +66,7 @@ table {
 
 table, th, td {
     border: 1px solid #ddd;
+    background-color: white;
 }
 
 th, td {
@@ -77,6 +80,7 @@ th, td {
     margin: auto;
     justify-content: center;
     align-items: center;
+    
 }
 
 form input, form select, form textarea, form button {
@@ -107,7 +111,9 @@ form button:hover {
 .button-group {
     display: flex;
     justify-content: center;
-    margin-top: 20px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    
 }
 
 .button-group .button {
@@ -119,7 +125,10 @@ form button:hover {
     cursor: pointer;
     margin: 0 10px;
     transition: background-color 0.3s ease;
+    
+
 }
+
 
 .button-group .button:hover {
     background-color: #0056b3;
@@ -170,4 +179,23 @@ option {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
+}
+
+.filter-container {
+    margin-bottom: 20px;
+    width: fit-content;
+}
+
+.filter-container select {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 5px; 
+    border: 1px solid #ccc; 
+    margin-right: 10px; 
+    transition: border-color 0.3s ease; 
+}
+
+.filter-container select:hover,
+.filter-container select:focus {
+    border-color: #007bff; 
 }

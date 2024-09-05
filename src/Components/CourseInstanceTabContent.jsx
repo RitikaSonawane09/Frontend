@@ -1,18 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Modal from 'react-modal';
-import '@fortawesome/fontawesome-free/css/all.min.css'; 
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
 Modal.setAppElement('#root');
 
-function CourseInstanceTabContent({ showInstancesTable }) {
+function CourseInstanceTabContent({
+    showInstancesTable,
+    setShowInstancesTable,
+    
+}) {
     const [courses, setCourses] = useState([]);
     const [instances, setInstances] = useState([]);
+    const [filteredInstances, setFilteredInstances] = useState([]);
     const [selectedCourseId, setSelectedCourseId] = useState('');
-    const [year, setYear] = useState('');
-    const [semester, setSemester] = useState('');
-    const [loadingCourses, setLoadingCourses] = useState(true);
-    const [loadingInstances, setLoadingInstances] = useState(true);
+    const [formYear, setFormYear] = useState('');
+    const [formSemester, setFormSemester] = useState('');
+    const [filterYear, setFilterYear] = useState('');
+    const [filterSemester, setFilterSemester] = useState('');
+    const [availableYears, setAvailableYears] = useState([]);
+    const [availableSemesters, setAvailableSemesters] = useState([]);
+    const [loadingCourses, setLoadingCourses] = useState(false);
+    const [loadingInstances, setLoadingInstances] = useState(false);
     const [error, setError] = useState(null);
     const [modalIsOpen, setModalIsOpen] = useState(false);
     const [selectedInstance, setSelectedInstance] = useState(null);
@@ -20,12 +29,17 @@ function CourseInstanceTabContent({ showInstancesTable }) {
     useEffect(() => {
         fetchCourses();
         fetchInstances();
-    }, [year, semester]);
+    }, []);
+
+    useEffect(() => {
+        if (showInstancesTable) {
+            filterInstances(); // Apply filters when they change
+        }
+    }, [filterYear, filterSemester, instances, showInstancesTable]);
 
     const fetchCourses = async () => {
         try {
             const response = await axios.get('http://127.0.0.1:8000/api/courses/');
-            console.log('Courses data:', response.data);
             setCourses(response.data);
         } catch (error) {
             setError(error);
@@ -37,9 +51,16 @@ function CourseInstanceTabContent({ showInstancesTable }) {
     const fetchInstances = async () => {
         setLoadingInstances(true);
         try {
-            const response = await axios.get(`http://127.0.0.1:8000/api/instances/?year=${year}&semester=${semester}`);
-            console.log('Instances data:', response.data);
-            setInstances(response.data);
+            const response = await axios.get('http://127.0.0.1:8000/api/instances/');
+            const instancesData = response.data;
+            setInstances(instancesData);
+
+            // Extract years and semesters for the dropdowns
+            const years = [...new Set(instancesData.map(instance => instance.year))];
+            const semesters = [...new Set(instancesData.map(instance => instance.semester))];
+
+            setAvailableYears(years);
+            setAvailableSemesters(semesters);
         } catch (error) {
             setError(error);
         } finally {
@@ -47,15 +68,28 @@ function CourseInstanceTabContent({ showInstancesTable }) {
         }
     };
 
+    const filterInstances = () => {
+        let filtered = [...instances];
+    
+        if (filterYear) {
+            filtered = filtered.filter(instance => instance.year === Number(filterYear));
+        }
+    
+        if (filterSemester) {
+            filtered = filtered.filter(instance => instance.semester === Number(filterSemester));
+        }
+    
+        setFilteredInstances(filtered);
+    };
+    
     const handleSubmit = async (event) => {
         event.preventDefault();
 
         const instanceData = {
             course: selectedCourseId,
-            year: year.trim(),
-            semester: semester.trim(),
+            year: formYear.trim(),
+            semester: formSemester.trim(),
         };
-        console.log('Instance Data:', instanceData);
 
         try {
             const response = await axios.post('http://127.0.0.1:8000/api/instances/', instanceData, {
@@ -67,15 +101,15 @@ function CourseInstanceTabContent({ showInstancesTable }) {
             if (response.status === 201) {
                 alert('Course instance added successfully.');
                 setSelectedCourseId('');
-                setYear('');
-                setSemester('');
-                fetchInstances();
+                setFormYear('');
+                setFormSemester('');
+                fetchInstances(); 
+                
             }
         } catch (error) {
             if (error.response && error.response.status === 400) {
                 alert('Course instance already exists.');
             } else {
-                console.error('Error:', error);
                 alert('An error occurred.');
             }
         }
@@ -85,15 +119,14 @@ function CourseInstanceTabContent({ showInstancesTable }) {
         try {
             await axios.delete(`http://127.0.0.1:8000/api/instances/${instanceId}/`);
             alert('Course instance deleted successfully.');
-            fetchInstances();
+            fetchInstances(); // Refresh instances after deleting
         } catch (error) {
-            console.error('Error deleting instance:', error);
             alert('An error occurred while deleting the instance.');
         }
     };
 
     const handleView = (instance) => {
-        setSelectedInstance(instance);  
+        setSelectedInstance(instance);
         setModalIsOpen(true);
     };
 
@@ -102,7 +135,11 @@ function CourseInstanceTabContent({ showInstancesTable }) {
         setSelectedInstance(null);
     };
 
-    if (loadingCourses) return <p>Loading courses...</p>;
+    const handleFilter = () => {
+        filterInstances(); // Apply filters when button is clicked
+        setShowInstancesTable(true); // Ensure table is shown after filtering
+    };
+
     if (loadingInstances) return <p>Loading instances...</p>;
     if (error) return <p>Error: {error.message}</p>;
 
@@ -111,22 +148,71 @@ function CourseInstanceTabContent({ showInstancesTable }) {
             <form onSubmit={handleSubmit}>
                 <select value={selectedCourseId} onChange={(e) => setSelectedCourseId(e.target.value)} required>
                     <option value="">Select Course</option>
-                    {courses.length > 0 ? (
-                        courses.map(course => (
-                            <option key={course.id} value={course.id}>
-                                {course.course_name}
-                            </option>
-                        ))
-                    ) : (
-                        <option value="">No courses available</option>
-                    )}
+                    {courses.map(course => (
+                        <option key={course.id} value={course.id}>
+                            {course.course_name}
+                        </option>
+                    ))}
                 </select>
-                <input type='number' placeholder='Year' value={year} onChange={(e) => setYear(e.target.value)} required />
-                <input type='text' placeholder='Semester' value={semester} onChange={(e) => setSemester(e.target.value)} required />
+                <input
+                    type='number'
+                    placeholder='Year'
+                    value={formYear}
+                    onChange={(e) => setFormYear(e.target.value)}
+                    required
+                />
+                <input
+                    type='text'
+                    placeholder='Semester'
+                    value={formSemester}
+                    onChange={(e) => setFormSemester(e.target.value)}
+                    required
+                />
                 <button type='submit'>Add Instance</button>
             </form>
+    
+            {/* Filter section */}
+            <div className='filter-container'>
+                <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
+                    <option value="">Select Year</option>
+                    {availableYears.map(year => (
+                        <option key={year} value={year}>
+                            {year}
+                        </option>
+                    ))}
+                </select>
+    
+                <select value={filterSemester} onChange={(e) => setFilterSemester(e.target.value)}>
+                    <option value="">Select Semester</option>
+                    {availableSemesters.map(semester => (
+                        <option key={semester} value={semester}>
+                            {semester}
+                        </option>
+                    ))}
+                </select>
+                <button
+    onClick={handleFilter}
+    style={{
+        backgroundColor: '#007bff', 
+        color: 'white', 
+        border: 'none',
+        borderRadius: '5px', 
+        padding: '10px 20px',
+        cursor: 'pointer', 
+        fontSize: '16px', 
+        transition: 'background-color 0.3s ease', 
+        margin: '0 10px', 
+    }}
+    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0056b3'} 
+    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#007bff'} 
+>
+    Filter
+</button>
 
-            {showInstancesTable && instances.length > 0 && (
+            </div>
+    
+            {/* Show filtered instances in a table */}
+            {showInstancesTable && filteredInstances.length > 0 && (
                 <table>
                     <thead>
                         <tr>
@@ -137,22 +223,22 @@ function CourseInstanceTabContent({ showInstancesTable }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {instances.map(instance => {
-                            const course = courses.find(c => c.id === instance.course);  
+                        {filteredInstances.map(instance => {
+                            const course = courses.find(c => c.id === instance.course);
                             return (
                                 <tr key={instance.id}>
                                     <td>{course ? course.course_name : 'Unknown'}</td>
                                     <td>{instance.year}-{instance.semester}</td>
                                     <td>{course ? course.course_code : 'Unknown'}</td>
                                     <td>
-                                        <i 
-                                            className="fas fa-search" 
-                                            onClick={() => handleView(instance)}  
+                                        <i
+                                            className="fas fa-search"
+                                            onClick={() => handleView(instance)}
                                             title="View Course instance"
                                             style={{ marginRight: '10px' }}
                                         ></i>
-                                        <i 
-                                            className="fas fa-trash-alt" 
+                                        <i
+                                            className="fas fa-trash-alt"
                                             onClick={() => handleDelete(instance.id)}
                                             title="Delete Course instance"
                                         ></i>
@@ -163,9 +249,11 @@ function CourseInstanceTabContent({ showInstancesTable }) {
                     </tbody>
                 </table>
             )}
-
-            {showInstancesTable && instances.length === 0 && <p>No instances available.</p>}
-
+    
+            {/* Message for no instances */}
+            {showInstancesTable && filteredInstances.length === 0 && <p>No instances available.</p>}
+    
+            {/* Modal for viewing instance details */}
             <Modal
                 isOpen={modalIsOpen}
                 onRequestClose={closeModal}
@@ -189,11 +277,11 @@ function CourseInstanceTabContent({ showInstancesTable }) {
                         )}
                         <p><strong>Year:</strong> {selectedInstance.year || 'N/A'}</p>
                         <p><strong>Semester:</strong> {selectedInstance.semester || 'N/A'}</p>
+                        <button onClick={closeModal}>Close</button>
                     </div>
                 ) : (
-                    <p>No details available.</p>
+                    <p>No instance selected.</p>
                 )}
-                <button onClick={closeModal}>Close</button>
             </Modal>
         </div>
     );
